@@ -720,7 +720,8 @@ impl<'a, 'tcx> ObligationProcessor for FulfillProcessor<'a, 'tcx> {
                                     && matches!(
                                         a.kind,
                                         ty::AliasConstKind::Projection { .. }
-                                            | ty::AliasConstKind::Inherent { .. }
+                                            | ty::AliasConstKind::InherentSelf { .. }
+                                            | ty::AliasConstKind::InherentImpl { .. }
                                     ) =>
                             {
                                 if let Ok(new_obligations) = infcx
@@ -1066,6 +1067,7 @@ impl<'tcx> FromSolverError<'tcx, OldSolverError<'tcx>> for ScrubbedTraitError<'t
         match error.0.error {
             FulfillmentErrorCode::Select(_)
             | FulfillmentErrorCode::Project(_)
+            | FulfillmentErrorCode::Outlives
             | FulfillmentErrorCode::Subtype(_, _)
             | FulfillmentErrorCode::ConstEquate(_, _) => ScrubbedTraitError::TrueError,
             FulfillmentErrorCode::Ambiguity { overflow: _ } => ScrubbedTraitError::Ambiguity,
