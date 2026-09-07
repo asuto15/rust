@@ -155,11 +155,6 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 let local_scope = this.local_scope();
                 let (true_block, false_block) =
                     this.in_if_then_scope(local_scope, expr_span, |this| {
-                        // Help out coverage instrumentation by injecting a dummy statement with
-                        // the original condition's span (including `!`). This fixes #115468.
-                        if this.tcx.sess.instrument_coverage() {
-                            this.cfg.push_coverage_span_marker(block, this.source_info(expr_span));
-                        }
                         this.lower_if_condition(block, arg, args.let_not_permitted())
                     });
                 // Break if the condition was true; proceed if the condition was false.
@@ -167,12 +162,13 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
                 false_block.unit()
             }
             ExprKind::Scope { region_scope, hir_id, value } => {
-                let region_scope = (region_scope, this.source_info(expr_span));
-                this.in_scope(region_scope, LintLevel::Explicit(hir_id), |this| {
+                let source_info = this.source_info(expr_span);
+                this.in_scope((region_scope, source_info), LintLevel::Explicit(hir_id), |this| {
+                    this.push_coverage_point_for_expr(block, source_info, hir_id);
                     this.lower_if_condition(block, value, args)
                 })
             }
-            ExprKind::Use { source } => this.lower_if_condition(block, source, args),
+            ExprKind::ValueExpr { source } => this.lower_if_condition(block, source, args),
             ExprKind::Let { expr, ref pat } => this.lower_let_expr(
                 block,
                 expr,
@@ -749,7 +745,7 @@ impl<'a, 'tcx> Builder<'a, 'tcx> {
             ExprKind::Scope { value, .. } => {
                 self.declare_guard_bindings(value, scope_span, visibility_scope);
             }
-            ExprKind::Use { source } => {
+            ExprKind::ValueExpr { source } => {
                 self.declare_guard_bindings(source, scope_span, visibility_scope);
             }
             ExprKind::LogicalOp { op: LogicalOp::And, lhs, rhs } => {
